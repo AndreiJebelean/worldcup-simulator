@@ -46,7 +46,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   };
 
   // -------------------------------------------------------------
-  // FIXED STAGE PRIORITY ASSIGNMENT (STRICT NUMERICAL ORDER)
+  // STRICT MATCH ID PRIORITY COLLISION RESOLVER
   // -------------------------------------------------------------
   const resolvedThirdPlaceMatches = useMemo(() => {
     if (!thirdPlaceStandings || thirdPlaceStandings.length === 0) return {};
@@ -57,7 +57,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
 
     // Evaluated strictly by incremental Match ID priority rules
     const matchNumericalOrder = [
-      { id: 'M74', pools: ['A', 'B', 'C', 'D', 'F'] }, // M74 gets highest priority pick
+      { id: 'M74', pools: ['A', 'B', 'C', 'D', 'F'] }, // M74 has absolute first pick of the top 8 list
       { id: 'M77', pools: ['C', 'D', 'F', 'G', 'H'] },
       { id: 'M79', pools: ['C', 'E', 'F', 'H', 'I'] },
       { id: 'M80', pools: ['E', 'H', 'I', 'J', 'K'] },
@@ -197,7 +197,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   const champion = useMemo(() => getWinner('M103', liveFinalMatch.home, liveFinalMatch.away), [liveFinalMatch]);
 
   // -------------------------------------------------------------
-  // RENDERING UTILS
+  // RENDERING COMPONENTS
   // -------------------------------------------------------------
   const TeamRow = ({ team }) => {
     const isTBD = !team || team.id === 'TBD';
