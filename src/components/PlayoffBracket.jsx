@@ -46,30 +46,28 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   };
 
   // -------------------------------------------------------------
-  // DYNAMIC COLLISION RESOLVER FOR 3RD PLACE TEAMS
+  // NUMERICAL PRIORITY COLLISION RESOLVER FOR 3RD PLACE TEAMS
   // -------------------------------------------------------------
   const resolvedThirdPlaceMatches = useMemo(() => {
     if (!thirdPlaceStandings || thirdPlaceStandings.length === 0) return {};
 
-    // Get the top 8 qualified 3rd-placed teams overall
     const qualifiedThirds = thirdPlaceStandings.slice(0, 8);
     const allocatedTeamIds = new Set();
     const allocations = {};
 
-    // Strict vertical execution order from top to bottom as layout flows
-    const matchPoolRequirements = [
+    // Evaluated strictly by Match Number Order to assign true priority
+    const matchNumericalOrder = [
       { id: 'M74', pools: ['A', 'B', 'C', 'D', 'F'] },
       { id: 'M77', pools: ['C', 'D', 'F', 'G', 'H'] },
-      { id: 'M81', pools: ['B', 'E', 'F', 'I', 'J'] },
-      { id: 'M82', pools: ['A', 'E', 'H', 'I', 'J'] },
       { id: 'M79', pools: ['C', 'E', 'F', 'H', 'I'] },
       { id: 'M80', pools: ['E', 'H', 'I', 'J', 'K'] },
+      { id: 'M81', pools: ['B', 'E', 'F', 'I', 'J'] },
+      { id: 'M82', pools: ['A', 'E', 'H', 'I', 'J'] },
       { id: 'M85', pools: ['E', 'F', 'G', 'I', 'J'] },
       { id: 'M87', pools: ['D', 'E', 'I', 'J', 'L'] }
     ];
 
-    matchPoolRequirements.forEach(({ id, pools }) => {
-      // Find the highest ranked 3rd-place team belonging to an allowed group that hasn't been taken yet
+    matchNumericalOrder.forEach(({ id, pools }) => {
       const matchedTeam = qualifiedThirds.find(team => 
         pools.includes(team.originGroup) && !allocatedTeamIds.has(team.id)
       );
@@ -86,7 +84,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   }, [thirdPlaceStandings]);
 
   // -------------------------------------------------------------
-  // ROUND OF 32 (RESOLVED LINEUP)
+  // ROUND OF 32 (RENDER IN VISUAL TREE LAYOUT ORDER)
   // -------------------------------------------------------------
   const liveR32Matches = useMemo(() => {
     const matches = {
@@ -216,7 +214,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   }, [liveFinalMatch, playoffScores]);
 
   // -------------------------------------------------------------
-  // RENDERING HELPERS
+  // RENDERING COMPONENTS
   // -------------------------------------------------------------
   const TeamRow = ({ team }) => {
     const isTBD = !team || team.id === 'TBD';
@@ -302,7 +300,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
             </div>
             <div className={`w-32 h-20 rounded-lg border flex flex-col items-center justify-center transition-all ${
               champion ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-slate-950/40 border-slate-800/80 border-dashed'
-            }`}>
+}}`}>
               {champion ? (
                 <div className="flex flex-col items-center space-y-1.5">
                   <img
