@@ -34,16 +34,6 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
     return null;
   };
 
-  const getThirdPlaceTeam = (priorityGroups) => {
-    if (!thirdPlaceStandings || thirdPlaceStandings.length === 0) return null;
-    const qualifiedThirds = thirdPlaceStandings.slice(0, 8);
-    const targetGroup = priorityGroups.find(g => qualifiedThirds.some(t => t.originGroup === g));
-    if (!targetGroup) return null;
-
-    const team = qualifiedThirds.find(t => t.originGroup === targetGroup);
-    return team ? { id: team.id, name: team.name, flag: team.flag } : null;
-  };
-
   const getWinner = (matchId, fallbackHome, fallbackAway) => {
     const scoreState = playoffScores[matchId];
     if (!scoreState) return null;
@@ -56,29 +46,69 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   };
 
   // -------------------------------------------------------------
-  // ROUND OF 32 (EXACT VERTICAL MATCHING FROM IMAGES)
+  // DYNAMIC COLLISION RESOLVER FOR 3RD PLACE TEAMS
+  // -------------------------------------------------------------
+  const resolvedThirdPlaceMatches = useMemo(() => {
+    if (!thirdPlaceStandings || thirdPlaceStandings.length === 0) return {};
+
+    // Get the top 8 qualified 3rd-placed teams overall
+    const qualifiedThirds = thirdPlaceStandings.slice(0, 8);
+    const allocatedTeamIds = new Set();
+    const allocations = {};
+
+    // Strict vertical execution order from top to bottom as layout flows
+    const matchPoolRequirements = [
+      { id: 'M74', pools: ['A', 'B', 'C', 'D', 'F'] },
+      { id: 'M77', pools: ['C', 'D', 'F', 'G', 'H'] },
+      { id: 'M81', pools: ['B', 'E', 'F', 'I', 'J'] },
+      { id: 'M82', pools: ['A', 'E', 'H', 'I', 'J'] },
+      { id: 'M79', pools: ['C', 'E', 'F', 'H', 'I'] },
+      { id: 'M80', pools: ['E', 'H', 'I', 'J', 'K'] },
+      { id: 'M85', pools: ['E', 'F', 'G', 'I', 'J'] },
+      { id: 'M87', pools: ['D', 'E', 'I', 'J', 'L'] }
+    ];
+
+    matchPoolRequirements.forEach(({ id, pools }) => {
+      // Find the highest ranked 3rd-place team belonging to an allowed group that hasn't been taken yet
+      const matchedTeam = qualifiedThirds.find(team => 
+        pools.includes(team.originGroup) && !allocatedTeamIds.has(team.id)
+      );
+
+      if (matchedTeam) {
+        allocations[id] = { id: matchedTeam.id, name: matchedTeam.name, flag: matchedTeam.flag };
+        allocatedTeamIds.add(matchedTeam.id);
+      } else {
+        allocations[id] = { id: 'TBD', name: 'TBD', flag: '' };
+      }
+    });
+
+    return allocations;
+  }, [thirdPlaceStandings]);
+
+  // -------------------------------------------------------------
+  // ROUND OF 32 (RESOLVED LINEUP)
   // -------------------------------------------------------------
   const liveR32Matches = useMemo(() => {
     const matches = {
       // --- LEFT SIDE (image_3dceef.png) ---
-      M74: { home: () => ({ id: 'GER', name: 'Germany', flag: 'de' }), away: () => getThirdPlaceTeam(['A', 'B', 'C', 'D', 'F']) },
-      M77: { home: () => getTeam('I', 0), away: () => getThirdPlaceTeam(['C', 'D', 'F', 'G', 'H']) },
+      M74: { home: () => ({ id: 'GER', name: 'Germany', flag: 'de' }), away: () => resolvedThirdPlaceMatches.M74 },
+      M77: { home: () => getTeam('I', 0), away: () => resolvedThirdPlaceMatches.M77 },
       M130: { home: () => ({ id: 'RSA', name: 'South Africa', flag: 'za' }), away: () => ({ id: 'CAN', name: 'Canada', flag: 'ca' }) },
       M75: { home: () => getTeam('F', 0), away: () => ({ id: 'MAR', name: 'Morocco', flag: 'ma' }) },
       M83: { home: () => getTeam('K', 1), away: () => getTeam('L', 1) },
       M84: { home: () => getTeam('H', 0), away: () => getTeam('J', 1) },
-      M81: { home: () => ({ id: 'USA', name: 'United States', flag: 'us' }), away: () => getThirdPlaceTeam(['B', 'E', 'F', 'I', 'J']) },
-      M82: { home: () => getTeam('G', 0), away: () => getThirdPlaceTeam(['A', 'E', 'H', 'I', 'J']) },
+      M81: { home: () => ({ id: 'USA', name: 'United States', flag: 'us' }), away: () => resolvedThirdPlaceMatches.M81 },
+      M82: { home: () => getTeam('G', 0), away: () => resolvedThirdPlaceMatches.M82 },
 
       // --- RIGHT SIDE (image_3dcf6a.png) ---
       M76: { home: () => ({ id: 'BRA', name: 'Brazil', flag: 'br' }), away: () => getTeam('F', 1) },
       M78: { home: () => getTeam('E', 1), away: () => getTeam('I', 1) },
-      M79: { home: () => ({ id: 'MEX', name: 'Mexico', flag: 'mx' }), away: () => getThirdPlaceTeam(['C', 'E', 'F', 'H', 'I']) },
-      M80: { home: () => getTeam('L', 0), away: () => getThirdPlaceTeam(['E', 'H', 'I', 'J', 'K']) },
+      M79: { home: () => ({ id: 'MEX', name: 'Mexico', flag: 'mx' }), away: () => resolvedThirdPlaceMatches.M79 },
+      M80: { home: () => getTeam('L', 0), away: () => resolvedThirdPlaceMatches.M80 },
       M86: { home: () => ({ id: 'ARG', name: 'Argentina', flag: 'ar' }), away: () => getTeam('H', 1) },
       M88: { home: () => getTeam('D', 1), away: () => getTeam('G', 1) },
-      M85: { home: () => ({ id: 'SUI', name: 'Switzerland', flag: 'ch' }), away: () => getThirdPlaceTeam(['E', 'F', 'G', 'I', 'J']) },
-      M87: { home: () => getTeam('K', 0), away: () => getThirdPlaceTeam(['D', 'E', 'I', 'J', 'L']) },
+      M85: { home: () => ({ id: 'SUI', name: 'Switzerland', flag: 'ch' }), away: () => resolvedThirdPlaceMatches.M85 },
+      M87: { home: () => getTeam('K', 0), away: () => resolvedThirdPlaceMatches.M87 },
     };
 
     return Object.keys(matches).reduce((acc, mId) => {
@@ -92,23 +122,21 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
       };
       return acc;
     }, {});
-  }, [standings, thirdPlaceStandings, playoffScores]);
+  }, [standings, resolvedThirdPlaceMatches, playoffScores]);
 
   // -------------------------------------------------------------
-  // HIGHER ROUND PROGRESSIONS (STRICT TREE DEPENDENCIES)
+  // HIGHER ROUND PROGRESSIONS
   // -------------------------------------------------------------
   const liveR16Matches = useMemo(() => {
     const structure = {
-      // Left side paths
-      M89: ['M74', 'M77'],   // Germany/3rd vs 1I/3rd
-      M90: ['M130', 'M75'],  // South Africa/Canada vs 1F/Morocco
-      M93: ['M83', 'M84'],   // 2K/2L vs 1H/2J
-      M94: ['M81', 'M82'],   // USA/3rd vs 1G/3rd
-      // Right side paths
-      M91: ['M76', 'M78'],   // Brazil/2F vs 2E/2I
-      M92: ['M79', 'M80'],   // Mexico/3rd vs 1L/3rd
-      M95: ['M86', 'M88'],   // Argentina/2H vs 2D/2G
-      M96: ['M85', 'M87']    // Switzerland/3rd vs 1K/3rd
+      M89: ['M74', 'M77'],
+      M90: ['M130', 'M75'],
+      M93: ['M83', 'M84'],
+      M94: ['M81', 'M82'],
+      M91: ['M76', 'M78'],
+      M92: ['M79', 'M80'],
+      M95: ['M86', 'M88'],
+      M96: ['M85', 'M87']
     };
 
     return Object.keys(structure).reduce((acc, mId) => {
@@ -128,10 +156,10 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
 
   const liveQFMatches = useMemo(() => {
     const structure = {
-      M97: ['M89', 'M90'],  // Winner M89 vs Winner M90
-      M98: ['M93', 'M94'],  // Winner M93 vs Winner M94
-      M99: ['M91', 'M92'],  // Winner M91 vs Winner M92
-      M100: ['M95', 'M96']  // Winner M95 vs Winner M96
+      M97: ['M89', 'M90'],
+      M98: ['M93', 'M94'],
+      M99: ['M91', 'M92'],
+      M100: ['M95', 'M96']
     };
 
     return Object.keys(structure).reduce((acc, mId) => {
@@ -151,8 +179,8 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
 
   const liveSFMatches = useMemo(() => {
     const structure = {
-      M101: ['M97', 'M98'], // Left Semifinal
-      M102: ['M99', 'M100'] // Right Semifinal
+      M101: ['M97', 'M98'],
+      M102: ['M99', 'M100']
     };
 
     return Object.keys(structure).reduce((acc, mId) => {
@@ -188,7 +216,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   }, [liveFinalMatch, playoffScores]);
 
   // -------------------------------------------------------------
-  // RENDERING COMPONENTS
+  // RENDERING HELPERS
   // -------------------------------------------------------------
   const TeamRow = ({ team }) => {
     const isTBD = !team || team.id === 'TBD';
@@ -256,13 +284,13 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
     <div className="w-full overflow-x-auto bg-[#070b0e] p-8 select-none">
       <div className="relative min-w-[1500px] grid grid-cols-9 gap-5 items-stretch content-center min-h-[820px]">
         
-        {/* LEFT SIDE BRACKET (image_3dceef.png) */}
+        {/* LEFT SIDE BRACKET */}
         <Column title="Round of 32" data={[liveR32Matches.M74, liveR32Matches.M77, liveR32Matches.M130, liveR32Matches.M75, liveR32Matches.M83, liveR32Matches.M84, liveR32Matches.M81, liveR32Matches.M82]} className="space-y-3" />
         <Column title="Round of 16" data={[liveR16Matches.M89, liveR16Matches.M90, liveR16Matches.M93, liveR16Matches.M94]} className="space-y-16" />
         <Column title="Quarterfinals" data={[liveQFMatches.M97, liveQFMatches.M98]} className="space-y-40" />
         <Column title="Semifinal" data={[liveSFMatches.M101]} className="space-y-0" />
 
-        {/* CENTER DECORATION & FINAL */}
+        {/* HERO CENTERPIECE */}
         <div className="flex flex-col justify-center items-center px-2 self-center space-y-5">
           <div className="w-full flex justify-center items-center pb-2">
             <img src={cupImg} alt="FIFA 2026" className="w-24 h-auto object-contain opacity-90" />
@@ -300,7 +328,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
           </div>
         </div>
 
-        {/* RIGHT SIDE BRACKET (image_3dcf6a.png) */}
+        {/* RIGHT SIDE BRACKET */}
         <Column title="Semifinal" data={[liveSFMatches.M102]} className="space-y-0" />
         <Column title="Quarterfinals" data={[liveQFMatches.M99, liveQFMatches.M100]} className="space-y-40" />
         <Column title="Round of 16" data={[liveR16Matches.M91, liveR16Matches.M92, liveR16Matches.M95, liveR16Matches.M96]} className="space-y-16" />
