@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import cupImg from '../assets/cup.png';
 
 export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [] }) {
   const [playoffScores, setPlayoffScores] = useState(() => {
@@ -69,7 +70,6 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
     return rankedThirds.find(t => t.originGroup === group) || null;
   };
 
-  // Helper helper to pull dynamic winners for structural progression
   const getStageWinner = (matchId, fallbackHome, fallbackAway) => {
     const scoreState = playoffScores[matchId];
     if (!scoreState) return null;
@@ -84,7 +84,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   };
 
   // -----------------------------
-  // R32 SETUP
+  // PROGRESSIVE BRACKET MATCH DATA
   // -----------------------------
   const liveR32Matches = useMemo(() => {
     const baseR32Layout = [
@@ -119,9 +119,6 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
     });
   }, [standings, rankedThirds, groupSet, playoffScores]);
 
-  // -----------------------------
-  // PROGRESSIVE HIGHER STAGES
-  // -----------------------------
   const liveR16Matches = useMemo(() => {
     const pairings = [
       { id: 'R16_1', p: ['R32_1', 'R32_2'] }, { id: 'R16_2', p: ['R32_3', 'R32_4'] },
@@ -164,8 +161,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
 
   const liveSFMatches = useMemo(() => {
     const pairings = [
-      { id: 'SF_1', p: ['QF_1', 'QF_2'] },
-      { id: 'SF_2', p: ['QF_3', 'QF_4'] }
+      { id: 'SF_1', p: ['QF_1', 'QF_2'] }, { id: 'SF_2', p: ['QF_3', 'QF_4'] }
     ];
     return pairings.map(m => {
       const saved = playoffScores[m.id] || {};
@@ -183,56 +179,69 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
 
   const liveFinalMatch = useMemo(() => {
     const saved = playoffScores['FINAL'] || {};
-    const hMatch = liveSFMatches[0];
-    const aMatch = liveSFMatches[1];
     return [{
       id: 'FINAL',
-      home: getStageWinner('SF_1', hMatch?.home, hMatch?.away) || { id: 'TBD', name: 'TBD', flag: '' },
-      away: getStageWinner('SF_2', aMatch?.home, aMatch?.away) || { id: 'TBD', name: 'TBD', flag: '' },
+      home: getStageWinner('SF_1', liveSFMatches[0]?.home, liveSFMatches[0]?.away) || { id: 'TBD', name: 'TBD', flag: '' },
+      away: getStageWinner('SF_2', liveSFMatches[1]?.home, liveSFMatches[1]?.away) || { id: 'TBD', name: 'TBD', flag: '' },
       homeScore: saved.homeScore ?? '',
       awayScore: saved.awayScore ?? '',
     }];
   }, [liveSFMatches, playoffScores]);
 
+  const champion = useMemo(() => {
+    const f = liveFinalMatch[0];
+    return getStageWinner('FINAL', f.home, f.away);
+  }, [liveFinalMatch, playoffScores]);
+
   // -----------------------------
-  // UI DISPLAY COMPONENTS
+  // CLEAN COMPONENTS
   // -----------------------------
   const TeamRow = ({ team }) => {
     const isTBD = !team || team.id === 'TBD';
     return (
-      <div className="flex items-center gap-2.5 w-full justify-start">
-        {isTBD ? (
-          <div className="w-5 h-[14px] bg-white/5 border border-white/10 rounded-sm shrink-0" />
-        ) : (
-          <img
-            src={`https://flagcdn.com/20x15/${team.flag?.toLowerCase()}.png`}
-            alt={team.id}
-            className="rounded-sm object-cover shadow-sm border border-gray-800 w-5 h-[14px] shrink-0"
-          />
-        )}
-        <span className={`font-mono tracking-wide text-xs ${isTBD ? 'text-gray-500 font-medium' : 'text-slate-200 font-bold'}`}>
-          {team?.id || 'TBD'}
-        </span>
+      <div className="flex items-center justify-between w-full h-7 px-2">
+        <div className="flex items-center gap-3">
+          {isTBD ? (
+            <div className="w-5 h-3.5 bg-slate-800/60 rounded-sm border border-slate-700/50" />
+          ) : (
+            <img
+              src={`https://flagcdn.com/20x15/${team.flag?.toLowerCase()}.png`}
+              alt={team.id}
+              className="rounded-sm object-cover w-5 h-3.5 shadow-sm border border-black/10"
+            />
+          )}
+          <span className={`text-xs font-mono tracking-wide ${isTBD ? 'text-slate-500 font-medium' : 'text-slate-200 font-bold'}`}>
+            {team?.id || 'TBD'}
+          </span>
+        </div>
       </div>
     );
   };
 
   const MatchCard = ({ match }) => {
     return (
-      <div className="relative backdrop-blur-md bg-white/[0.02] border border-white/5 rounded-xl p-3 shadow-xl hover:border-cyan-500/30 transition-all flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-4">
+      <div className="w-full bg-[#0d131a] border border-slate-800/70 hover:border-emerald-500/30 rounded-lg p-1.5 shadow-md transition-all flex flex-col relative overflow-hidden group">
+        {/* Subtle accent indicator line on active matches */}
+        <div className="absolute top-0 left-0 h-full w-[2px] bg-emerald-500/0 group-hover:bg-emerald-500/40 transition-all" />
+        
+        <div className="flex items-center justify-between">
           <TeamRow team={match.home} />
           <input
-            className="w-9 h-7 text-center text-xs bg-black/40 border border-white/5 rounded-md text-green-400 font-mono font-bold focus:outline-none focus:border-cyan-500/50"
+            className="w-8 h-6 text-center text-xs bg-slate-900 border border-slate-800 rounded text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500/50"
             value={match.homeScore}
+            maxLength={2}
             onChange={e => updateScore(match.id, 'homeScore', e.target.value)}
           />
         </div>
-        <div className="flex items-center justify-between gap-4">
+        
+        <div className="h-[1px] bg-slate-800/40 my-1 w-[90%] mx-auto" />
+
+        <div className="flex items-center justify-between">
           <TeamRow team={match.away} />
           <input
-            className="w-9 h-7 text-center text-xs bg-black/40 border border-white/5 rounded-md text-green-400 font-mono font-bold focus:outline-none focus:border-cyan-500/50"
+            className="w-8 h-6 text-center text-xs bg-slate-900 border border-slate-800 rounded text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500/50"
             value={match.awayScore}
+            maxLength={2}
             onChange={e => updateScore(match.id, 'awayScore', e.target.value)}
           />
         </div>
@@ -242,7 +251,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
 
   const Column = ({ title, data, className = "space-y-6" }) => (
     <div className={`flex flex-col justify-center h-full ${className}`}>
-      <div className="text-center text-[10px] tracking-widest text-cyan-400/80 font-black mb-2 uppercase border-b border-white/5 pb-1">
+      <div className="text-center text-[10px] tracking-widest text-slate-400 font-bold mb-3 uppercase border-b border-slate-800/80 pb-1.5 font-sans">
         {title}
       </div>
       {data.map(m => <MatchCard key={m.id} match={m} />)}
@@ -250,30 +259,73 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   );
 
   return (
-    <div className="w-full overflow-x-auto bg-[#02040a] p-8 select-none">
-      <div className="min-w-[1500px] grid grid-cols-9 gap-4 items-stretch content-center min-h-[720px]">
+    <div className="w-full overflow-x-auto bg-[#070b0e] p-8 select-none font-sans">
+      <div className="relative min-w-[1500px] grid grid-cols-9 gap-5 items-stretch content-center min-h-[760px]">
         
-        {/* LEFT PATH */}
-        <Column title="Round of 32" data={liveR32Matches.slice(0, 8)} className="space-y-4" />
-        <Column title="Round of 16" data={liveR16Matches.slice(0, 4)} className="space-y-16" />
-        <Column title="Quarterfinals" data={liveQFMatches.slice(0, 2)} className="space-y-40" />
+        {/* LEFT BRACKET BRIDGES */}
+        <Column title="Round of 32" data={liveR32Matches.slice(0, 8)} className="space-y-3" />
+        <Column title="Round of 16" data={liveR16Matches.slice(0, 4)} className="space-y-14" />
+        <Column title="Quarterfinals" data={liveQFMatches.slice(0, 2)} className="space-y-36" />
         <Column title="Semifinal" data={[liveSFMatches[0]]} className="space-y-0" />
 
-        {/* CENTRAL NODE */}
-        <div className="flex flex-col justify-center items-center px-2">
-          <div className="text-center text-[11px] tracking-widest text-yellow-400 font-black mb-4 uppercase border-b border-yellow-500/20 pb-1 w-full">
-            🏆 WORLD CUP FINAL
+        {/* REFINED CENTRAL SHOWCASE NODE */}
+        <div className="flex flex-col justify-center items-center px-2 self-center space-y-5">
+          
+          {/* Logo Brand Frame */}
+          <div className="w-full flex justify-center items-center pb-2">
+            <img 
+              src={cupImg} 
+              alt="FIFA 2026" 
+              className="w-24 h-auto object-contain opacity-90 brightness-95"
+            />
           </div>
-          <div className="w-full transform scale-110 shadow-2xl">
-            <MatchCard match={liveFinalMatch[0]} />
+
+          {/* Premium Static Podium Container */}
+          <div className="w-full bg-slate-900/40 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center text-center shadow-lg">
+            <div className="text-[9px] tracking-[0.2em] text-slate-400 font-extrabold mb-3 uppercase">
+              TOURNAMENT CHAMPION
+            </div>
+            
+            <div className={`w-32 h-20 rounded-lg border flex flex-col items-center justify-center transition-all ${
+              champion 
+                ? 'bg-emerald-950/20 border-emerald-500/30' 
+                : 'bg-slate-950/40 border-slate-800/80 border-dashed'
+            }`}>
+              {champion ? (
+                <div className="flex flex-col items-center space-y-1.5">
+                  <img
+                    src={`https://flagcdn.com/56x42/${champion.flag?.toLowerCase()}.png`}
+                    alt={champion.name}
+                    className="w-11 h-7 rounded-sm object-cover shadow border border-black/10"
+                  />
+                  <span className="text-emerald-400 font-mono text-xs font-bold tracking-wider">
+                    {champion.id}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[10px] text-slate-600 font-mono font-medium tracking-widest uppercase">
+                  Pending
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Final Matchup Area */}
+          <div className="w-full">
+            <div className="text-center text-[10px] tracking-widest text-emerald-400 font-black mb-3 uppercase border-b border-emerald-950 pb-1 w-full">
+              FINAL MATCH
+            </div>
+            <div className="w-full transform scale-105 shadow-xl relative z-10">
+              <MatchCard match={liveFinalMatch[0]} />
+            </div>
           </div>
         </div>
 
-        {/* RIGHT PATH */}
+        {/* RIGHT BRACKET BRIDGES */}
         <Column title="Semifinal" data={[liveSFMatches[1]]} className="space-y-0" />
-        <Column title="Quarterfinals" data={liveQFMatches.slice(2, 4)} className="space-y-40" />
-        <Column title="Round of 16" data={liveR16Matches.slice(4, 8)} className="space-y-16" />
-        <Column title="Round of 32" data={liveR32Matches.slice(8, 16)} className="space-y-4" />
+        <Column title="Quarterfinals" data={liveQFMatches.slice(2, 4)} className="space-y-36" />
+        <Column title="Round of 16" data={liveR16Matches.slice(4, 8)} className="space-y-14" />
+        <Column title="Round of 32" data={liveR32Matches.slice(8, 16)} className="space-y-3" />
 
       </div>
     </div>
