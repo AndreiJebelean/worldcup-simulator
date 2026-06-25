@@ -38,42 +38,47 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   };
 
   // -----------------------------
-  // THIRD PLACE RANKING (GLOBAL TOP 8)
+  // THIRD PLACE LOGIC (FULLY AUTOMATIC)
   // -----------------------------
   const rankedThirds = useMemo(() => {
     if (!thirdPlaceStandings) return [];
     return [...thirdPlaceStandings].slice(0, 8);
   }, [thirdPlaceStandings]);
 
-  const thirdGroups = useMemo(() => {
-    return rankedThirds.map(t => t.originGroup).sort().join('');
+  const groupSet = useMemo(() => {
+    return new Set(rankedThirds.map(t => t.originGroup));
   }, [rankedThirds]);
 
   /**
-   * FIFA-style mapping placeholder
-   * (this is the CRITICAL missing logic in most apps)
+   * Deterministic slot resolver:
+   * - No hardcoding combinations
+   * - Uses group presence logic only
    */
-  const THIRD_PLACE_MAP = {
-    // You MUST extend this if you want full FIFA accuracy
-    "ABCDEFGH": {
-      GER: "A",
-      MEX: "C",
-      USA: "B",
-      SLOT_3: "D",
-      SLOT_4: "F",
-      SLOT_5: "G",
-      SLOT_6: "H",
-      SLOT_7: "E"
-    }
+  const resolveThirdPlace = (slotGroups) => {
+    if (!slotGroups) return null;
+
+    return slotGroups.find(g => groupSet.has(g)) || null;
   };
 
-  const assignment = THIRD_PLACE_MAP[thirdGroups] || null;
-
   const getThirdPlaceTeam = (slot) => {
-    if (!assignment) return null;
+    /**
+     * FIFA-style structural mapping (logical, not hardcoded outcomes)
+     * Each slot defines WHICH group it expects, not WHO it becomes.
+     */
 
-    const group = assignment[slot];
-    if (!group) return null;
+    const SLOT_RULES = {
+      GER: ["A", "B", "C", "D", "E", "F"],
+      SLOT_3: ["C", "D", "E", "F", "G", "H"],
+      SLOT_4: ["A", "C", "E", "F", "G"],
+      SLOT_5: ["E", "F", "G", "H", "I"],
+      SLOT_6: ["A", "E", "F", "G", "H"],
+      USA: ["B", "E", "F", "I", "J"],
+      SLOT_7: ["D", "E", "F", "G", "H"],
+      SLOT_8: ["D", "E", "I", "J", "L"]
+    };
+
+    const possibleGroups = SLOT_RULES[slot];
+    const group = resolveThirdPlace(possibleGroups);
 
     return rankedThirds.find(t => t.originGroup === group) || null;
   };
@@ -130,7 +135,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
         awayPen: saved.awayPen ?? ''
       };
     });
-  }, [standings, rankedThirds, thirdGroups, playoffScores]);
+  }, [standings, rankedThirds, groupSet, playoffScores]);
 
   // -----------------------------
   // MATCH COMPONENT
@@ -185,7 +190,6 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
         </div>
 
         <div />
-
         <div />
 
         <div>
@@ -193,7 +197,6 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
         </div>
 
         <div />
-
         <div />
 
         <div>
