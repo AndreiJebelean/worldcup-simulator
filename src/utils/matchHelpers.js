@@ -77,12 +77,12 @@ export const calculateStandings = (matches) => {
     }));
   });
 
+  // Calculate table statistics based on played games
   matches.forEach(m => {
     const hScore = parseInt(m.homeScore, 10);
     const aScore = parseInt(m.awayScore, 10);
 
     if (!isNaN(hScore) && !isNaN(aScore)) {
-      // Handles fallback matching whether your group key says "Group A" or just "A"
       const groupKey = m.group.length === 1 ? `Group ${m.group}` : m.group;
       const groupTeams = standings[groupKey];
       
@@ -112,8 +112,40 @@ export const calculateStandings = (matches) => {
     }
   });
 
+  // Sort each group table using your exact rules
   Object.keys(standings).forEach(group => {
-    standings[group].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    const groupLetter = group.replace("Group ", "");
+
+    standings[group].sort((a, b) => {
+      // 1. Points
+      if (b.pts !== a.pts) return b.pts - a.pts;
+
+      // 2. Direct Match (Head-to-Head)
+      const h2hMatch = matches.find(m => 
+        m.group === groupLetter && 
+        ((m.home === a.id && m.away === b.id) || (m.home === b.id && m.away === a.id))
+      );
+
+      if (h2hMatch) {
+        const hScore = parseInt(h2hMatch.homeScore, 10);
+        const aScore = parseInt(h2hMatch.awayScore, 10);
+
+        if (!isNaN(hScore) && !isNaN(aScore)) {
+          let winnerId = null;
+          if (hScore > aScore) winnerId = h2hMatch.home;
+          else if (aScore > hScore) winnerId = h2hMatch.away;
+
+          if (winnerId === a.id) return -1; // Team A won, goes first
+          if (winnerId === b.id) return 1;  // Team B won, goes first
+        }
+      }
+
+      // 3. Goal Difference
+      if (b.gd !== a.gd) return b.gd - a.gd;
+
+      // 4. Alphabetical Order
+      return a.id.localeCompare(b.id);
+    });
   });
 
   return standings;
@@ -131,5 +163,12 @@ export const calculateThirdPlace = (currentStandings) => {
       });
     }
   });
-  return thirdPlaceTeams.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+
+  // Wildcard ranking rule: Points -> Goal Difference -> Alphabetical Order
+  // Note: H2H is skipped here because teams from different groups do not play each other.
+  return thirdPlaceTeams.sort((a, b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    if (b.gd !== a.gd) return b.gd - a.gd;
+    return a.id.localeCompare(b.id);
+  });
 };
