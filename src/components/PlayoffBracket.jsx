@@ -46,7 +46,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   };
 
   // -------------------------------------------------------------
-  // NUMERICAL PRIORITY COLLISION RESOLVER FOR 3RD PLACE TEAMS
+  // FIXED STAGE PRIORITY ASSIGNMENT (STRICT NUMERICAL ORDER)
   // -------------------------------------------------------------
   const resolvedThirdPlaceMatches = useMemo(() => {
     if (!thirdPlaceStandings || thirdPlaceStandings.length === 0) return {};
@@ -55,9 +55,9 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
     const allocatedTeamIds = new Set();
     const allocations = {};
 
-    // Evaluated strictly by Match Number Order to assign true priority
+    // Evaluated strictly by incremental Match ID priority rules
     const matchNumericalOrder = [
-      { id: 'M74', pools: ['A', 'B', 'C', 'D', 'F'] },
+      { id: 'M74', pools: ['A', 'B', 'C', 'D', 'F'] }, // M74 gets highest priority pick
       { id: 'M77', pools: ['C', 'D', 'F', 'G', 'H'] },
       { id: 'M79', pools: ['C', 'E', 'F', 'H', 'I'] },
       { id: 'M80', pools: ['E', 'H', 'I', 'J', 'K'] },
@@ -68,6 +68,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
     ];
 
     matchNumericalOrder.forEach(({ id, pools }) => {
+      // Find the absolute highest ranked third place team that is eligible and unpicked
       const matchedTeam = qualifiedThirds.find(team => 
         pools.includes(team.originGroup) && !allocatedTeamIds.has(team.id)
       );
@@ -127,14 +128,8 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   // -------------------------------------------------------------
   const liveR16Matches = useMemo(() => {
     const structure = {
-      M89: ['M74', 'M77'],
-      M90: ['M130', 'M75'],
-      M93: ['M83', 'M84'],
-      M94: ['M81', 'M82'],
-      M91: ['M76', 'M78'],
-      M92: ['M79', 'M80'],
-      M95: ['M86', 'M88'],
-      M96: ['M85', 'M87']
+      M89: ['M74', 'M77'], M90: ['M130', 'M75'], M93: ['M83', 'M84'], M94: ['M81', 'M82'],
+      M91: ['M76', 'M78'], M92: ['M79', 'M80'], M95: ['M86', 'M88'], M96: ['M85', 'M87']
     };
 
     return Object.keys(structure).reduce((acc, mId) => {
@@ -153,13 +148,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   }, [liveR32Matches, playoffScores]);
 
   const liveQFMatches = useMemo(() => {
-    const structure = {
-      M97: ['M89', 'M90'],
-      M98: ['M93', 'M94'],
-      M99: ['M91', 'M92'],
-      M100: ['M95', 'M96']
-    };
-
+    const structure = { M97: ['M89', 'M90'], M98: ['M93', 'M94'], M99: ['M91', 'M92'], M100: ['M95', 'M96'] };
     return Object.keys(structure).reduce((acc, mId) => {
       const saved = playoffScores[mId] || {};
       const hSource = liveR16Matches[structure[mId][0]];
@@ -176,11 +165,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   }, [liveR16Matches, playoffScores]);
 
   const liveSFMatches = useMemo(() => {
-    const structure = {
-      M101: ['M97', 'M98'],
-      M102: ['M99', 'M100']
-    };
-
+    const structure = { M101: ['M97', 'M98'], M102: ['M99', 'M100'] };
     return Object.keys(structure).reduce((acc, mId) => {
       const saved = playoffScores[mId] || {};
       const hSource = liveQFMatches[structure[mId][0]];
@@ -209,12 +194,10 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
     };
   }, [liveSFMatches, playoffScores]);
 
-  const champion = useMemo(() => {
-    return getWinner('M103', liveFinalMatch.home, liveFinalMatch.away);
-  }, [liveFinalMatch, playoffScores]);
+  const champion = useMemo(() => getWinner('M103', liveFinalMatch.home, liveFinalMatch.away), [liveFinalMatch]);
 
   // -------------------------------------------------------------
-  // RENDERING COMPONENTS
+  // RENDERING UTILS
   // -------------------------------------------------------------
   const TeamRow = ({ team }) => {
     const isTBD = !team || team.id === 'TBD';
@@ -293,21 +276,12 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
           <div className="w-full flex justify-center items-center pb-2">
             <img src={cupImg} alt="FIFA 2026" className="w-24 h-auto object-contain opacity-90" />
           </div>
-
           <div className="w-full bg-slate-900/40 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center text-center shadow-lg">
-            <div className="text-[9px] tracking-[0.2em] text-slate-400 font-extrabold mb-3 uppercase">
-              TOURNAMENT CHAMPION
-            </div>
-            <div className={`w-32 h-20 rounded-lg border flex flex-col items-center justify-center transition-all ${
-              champion ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-slate-950/40 border-slate-800/80 border-dashed'
-}}`}>
+            <div className="text-[9px] tracking-[0.2em] text-slate-400 font-extrabold mb-3 uppercase">TOURNAMENT CHAMPION</div>
+            <div className={`w-32 h-20 rounded-lg border flex flex-col items-center justify-center transition-all ${champion ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-slate-950/40 border-slate-800/80 border-dashed'}`}>
               {champion ? (
                 <div className="flex flex-col items-center space-y-1.5">
-                  <img
-                    src={`https://flagcdn.com/56x42/${champion.flag?.toLowerCase()}.png`}
-                    alt={champion.name}
-                    className="w-11 h-7 rounded-sm object-cover shadow border border-black/10"
-                  />
+                  <img src={`https://flagcdn.com/56x42/${champion.flag?.toLowerCase()}.png`} alt={champion.name} className="w-11 h-7 rounded-sm object-cover shadow border border-black/10" />
                   <span className="text-emerald-400 font-mono text-xs font-bold tracking-wider">{champion.id}</span>
                 </div>
               ) : (
@@ -315,11 +289,8 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
               )}
             </div>
           </div>
-
           <div className="w-full">
-            <div className="text-center text-[10px] tracking-widest text-emerald-400 font-black mb-3 uppercase border-b border-emerald-950 pb-1 w-full">
-              FINAL MATCH
-            </div>
+            <div className="text-center text-[10px] tracking-widest text-emerald-400 font-black mb-3 uppercase border-b border-emerald-950 pb-1 w-full">FINAL MATCH</div>
             <div className="w-full transform scale-105 shadow-xl relative z-10">
               <MatchCard match={liveFinalMatch} />
             </div>
