@@ -18,184 +18,182 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
     }));
   };
 
-  // -----------------------------
-  // GROUP LOOKUP
-  // -----------------------------
-  const getTeamFromStandings = (groupLetter, rankIndex) => {
+  // -------------------------------------------------------------
+  // CORE SEEDING HELPERS
+  // -------------------------------------------------------------
+  const getTeam = (groupLetter, rank) => {
     const groupKey = `Group ${groupLetter}`;
     const groupTeams = standings[groupKey];
-
-    if (groupTeams && groupTeams[rankIndex]) {
-      const team = groupTeams[rankIndex];
+    if (groupTeams && groupTeams[rank]) {
       return {
-        id: team.id,
-        name: team.name,
-        flag: team.flag
+        id: groupTeams[rank].id,
+        name: groupTeams[rank].name,
+        flag: groupTeams[rank].flag
       };
     }
     return null;
   };
 
-  // -----------------------------
-  // THIRD PLACE LOGIC (FULLY AUTOMATIC)
-  // -----------------------------
-  const rankedThirds = useMemo(() => {
-    if (!thirdPlaceStandings) return [];
-    return [...thirdPlaceStandings].slice(0, 8);
-  }, [thirdPlaceStandings]);
+  // Rule: Find the highest ranked available 3rd place team matching the prioritized group order
+  const getThirdPlaceTeam = (priorityGroups) => {
+    if (!thirdPlaceStandings || thirdPlaceStandings.length === 0) return null;
+    
+    // Take the top 8 qualified 3rd place teams overall
+    const qualifiedThirds = thirdPlaceStandings.slice(0, 8);
 
-  const groupSet = useMemo(() => {
-    return new Set(rankedThirds.map(t => t.originGroup));
-  }, [rankedThirds]);
+    // Find the first group in the match's priority list that successfully qualified
+    const targetGroup = priorityGroups.find(g => qualifiedThirds.some(t => t.originGroup === g));
+    if (!targetGroup) return null;
 
-  const resolveThirdPlace = (slotGroups) => {
-    if (!slotGroups) return null;
-    return slotGroups.find(g => groupSet.has(g)) || null;
+    const team = qualifiedThirds.find(t => t.originGroup === targetGroup);
+    return team ? { id: team.id, name: team.name, flag: team.flag } : null;
   };
 
-  const getThirdPlaceTeam = (slot) => {
-    const SLOT_RULES = {
-      GER: ["A", "B", "C", "D", "E", "F"],
-      SLOT_3: ["C", "D", "E", "F", "G", "H"],
-      SLOT_4: ["A", "C", "E", "F", "G"],
-      SLOT_5: ["E", "F", "G", "H", "I"],
-      SLOT_6: ["A", "E", "F", "G", "H"],
-      USA: ["B", "E", "F", "I", "J"],
-      SLOT_7: ["D", "E", "F", "G", "H"],
-      SLOT_8: ["D", "E", "I", "J", "L"]
-    };
-
-    const possibleGroups = SLOT_RULES[slot];
-    const group = resolveThirdPlace(possibleGroups);
-    return rankedThirds.find(t => t.originGroup === group) || null;
-  };
-
-  const getStageWinner = (matchId, fallbackHome, fallbackAway) => {
+  const getWinner = (matchId, fallbackHome, fallbackAway) => {
     const scoreState = playoffScores[matchId];
     if (!scoreState) return null;
-
     const s1 = parseInt(scoreState.homeScore, 10);
     const s2 = parseInt(scoreState.awayScore, 10);
-
     if (isNaN(s1) || isNaN(s2)) return null;
     if (s1 > s2) return fallbackHome?.id !== 'TBD' ? fallbackHome : null;
     if (s2 > s1) return fallbackAway?.id !== 'TBD' ? fallbackAway : null;
     return null;
   };
 
-  // -----------------------------
-  // PROGRESSIVE BRACKET MATCH DATA
-  // -----------------------------
+  // -------------------------------------------------------------
+  // ROUND OF 32 (EXACT IMAGE MAPPING BY MATCH NUMBER)
+  // -------------------------------------------------------------
   const liveR32Matches = useMemo(() => {
-    const baseR32Layout = [
-      { id: 'R32_1', home: () => getTeamFromStandings('A', 1), away: () => getTeamFromStandings('B', 1) },
-      { id: 'R32_2', home: () => getTeamFromStandings('C', 0), away: () => getTeamFromStandings('F', 1) },
-      { id: 'R32_3', home: () => ({ id: 'GER', name: 'Germany', flag: 'de' }), away: () => getThirdPlaceTeam('GER') },
-      { id: 'R32_4', home: () => getTeamFromStandings('F', 0), away: () => getTeamFromStandings('C', 1) },
-      { id: 'R32_5', home: () => getTeamFromStandings('E', 1), away: () => getTeamFromStandings('I', 1) },
-      { id: 'R32_6', home: () => getTeamFromStandings('I', 0), away: () => getThirdPlaceTeam('SLOT_3') },
-      { id: 'R32_7', home: () => ({ id: 'MEX', name: 'Mexico', flag: 'mx' }), away: () => getThirdPlaceTeam('SLOT_4') },
-      { id: 'R32_8', home: () => getTeamFromStandings('L', 0), away: () => getThirdPlaceTeam('SLOT_5') },
+    const matches = {
+      // --- LEFT SIDE (image_3d6a0e.png) ---
+      M74: { home: () => ({ id: 'GER', name: 'Germany', flag: 'de' }), away: () => getThirdPlaceTeam(['A', 'B', 'C', 'D', 'F']) },
+      M77: { home: () => getTeam('I', 0), away: () => getThirdPlaceTeam(['C', 'D', 'F', 'G', 'H']) },
+      M130: { home: () => ({ id: 'RSA', name: 'South Africa', flag: 'za' }), away: () => ({ id: 'CAN', name: 'Canada', flag: 'ca' }) },
+      M75: { home: () => getTeam('F', 0), away: () => ({ id: 'MAR', name: 'Morocco', flag: 'ma' }) },
+      M83: { home: () => getTeam('K', 1), away: () => getTeam('L', 1) },
+      M84: { home: () => getTeam('H', 0), away: () => getTeam('J', 1) },
+      M81: { home: () => ({ id: 'USA', name: 'United States', flag: 'us' }), away: () => getThirdPlaceTeam(['B', 'E', 'F', 'I', 'J']) },
+      M82: { home: () => getTeam('G', 0), away: () => getThirdPlaceTeam(['A', 'E', 'H', 'I', 'J']) },
 
-      { id: 'R32_9', home: () => getTeamFromStandings('G', 0), away: () => getThirdPlaceTeam('SLOT_6') },
-      { id: 'R32_10', home: () => ({ id: 'USA', name: 'United States', flag: 'us' }), away: () => getThirdPlaceTeam('USA') },
-      { id: 'R32_11', home: () => getTeamFromStandings('H', 0), away: () => getTeamFromStandings('J', 1) },
-      { id: 'R32_12', home: () => getTeamFromStandings('K', 1), away: () => getTeamFromStandings('L', 1) },
-      { id: 'R32_13', home: () => getTeamFromStandings('B', 0), away: () => getThirdPlaceTeam('SLOT_7') },
-      { id: 'R32_14', home: () => getTeamFromStandings('D', 1), away: () => getTeamFromStandings('G', 1) },
-      { id: 'R32_15', home: () => ({ id: 'ARG', name: 'Argentina', flag: 'ar' }), away: () => getTeamFromStandings('H', 1) },
-      { id: 'R32_16', home: () => getTeamFromStandings('K', 0), away: () => getThirdPlaceTeam('SLOT_8') },
-    ];
+      // --- RIGHT SIDE (image_3dbbe6.png) ---
+      M76: { home: () => ({ id: 'BRA', name: 'Brazil', flag: 'br' }), away: () => getTeam('F', 1) },
+      M78: { home: () => getTeam('E', 1), away: () => getTeam('I', 1) },
+      M79: { home: () => ({ id: 'MEX', name: 'Mexico', flag: 'mx' }), away: () => getThirdPlaceTeam(['C', 'E', 'F', 'H', 'I']) },
+      M80: { home: () => getTeam('L', 0), away: () => getThirdPlaceTeam(['E', 'H', 'I', 'J', 'K']) },
+      M86: { home: () => ({ id: 'ARG', name: 'Argentina', flag: 'ar' }), away: () => getTeam('H', 1) },
+      M88: { home: () => getTeam('D', 1), away: () => getTeam('G', 1) },
+      M85: { home: () => ({ id: 'SUI', name: 'Switzerland', flag: 'ch' }), away: () => getThirdPlaceTeam(['E', 'F', 'G', 'I', 'J']) },
+      M87: { home: () => getTeam('K', 0), away: () => getThirdPlaceTeam(['D', 'E', 'I', 'J', 'L']) },
+    };
 
-    return baseR32Layout.map(m => {
-      const saved = playoffScores[m.id] || {};
-      return {
-        id: m.id,
-        home: m.home() || { id: 'TBD', name: 'TBD', flag: '' },
-        away: m.away() || { id: 'TBD', name: 'TBD', flag: '' },
+    return Object.keys(matches).reduce((acc, mId) => {
+      const saved = playoffScores[mId] || {};
+      acc[mId] = {
+        id: mId,
+        home: matches[mId].home() || { id: 'TBD', name: 'TBD', flag: '' },
+        away: matches[mId].away() || { id: 'TBD', name: 'TBD', flag: '' },
         homeScore: saved.homeScore ?? '',
         awayScore: saved.awayScore ?? '',
       };
-    });
-  }, [standings, rankedThirds, groupSet, playoffScores]);
+      return acc;
+    }, {});
+  }, [standings, thirdPlaceStandings, playoffScores]);
 
+  // -------------------------------------------------------------
+  // HIGHER ROUND PROGRESSIONS (EXACTLY AS DIAGRAMMED)
+  // -------------------------------------------------------------
   const liveR16Matches = useMemo(() => {
-    const pairings = [
-      { id: 'R16_1', p: ['R32_1', 'R32_2'] }, { id: 'R16_2', p: ['R32_3', 'R32_4'] },
-      { id: 'R16_3', p: ['R32_5', 'R32_6'] }, { id: 'R16_4', p: ['R32_7', 'R32_8'] },
-      { id: 'R16_5', p: ['R32_9', 'R32_10'] }, { id: 'R16_6', p: ['R32_11', 'R32_12'] },
-      { id: 'R16_7', p: ['R32_13', 'R32_14'] }, { id: 'R16_8', p: ['R32_15', 'R32_16'] },
-    ];
-    return pairings.map(m => {
-      const saved = playoffScores[m.id] || {};
-      const hMatch = liveR32Matches.find(r => r.id === m.p[0]);
-      const aMatch = liveR32Matches.find(r => r.id === m.p[1]);
-      return {
-        id: m.id,
-        home: getStageWinner(m.p[0], hMatch?.home, hMatch?.away) || { id: 'TBD', name: 'TBD', flag: '' },
-        away: getStageWinner(m.p[1], aMatch?.home, aMatch?.away) || { id: 'TBD', name: 'TBD', flag: '' },
+    // Explicit tree paths from images
+    const structure = {
+      M89: ['M77', 'M83'],  // RD32 W2 & W5 (Visual order slots top-to-bottom)
+      M90: ['M74', 'M130'], // RD32 W1 & W3
+      M93: ['M83', 'M84'],  // RD32 W11 & W12
+      M94: ['M81', 'M82'],  // RD32 W9 & W10
+      M91: ['M75', 'M84'],  // RD32 W4 & W6 (Right side mapping starts)
+      M92: ['M81', 'M82'],  // RD32 W7 & W8
+      M95: ['M86', 'M88'],  // RD32 W14 & W16
+      M96: ['M85', 'M87']   // RD32 W13 & W15
+    };
+
+    return Object.keys(structure).reduce((acc, mId) => {
+      const saved = playoffScores[mId] || {};
+      const hSource = liveR32Matches[structure[mId][0]];
+      const aSource = liveR32Matches[structure[mId][1]];
+      acc[mId] = {
+        id: mId,
+        home: getWinner(hSource.id, hSource.home, hSource.away) || { id: 'TBD', name: 'TBD', flag: '' },
+        away: getWinner(aSource.id, aSource.home, aSource.away) || { id: 'TBD', name: 'TBD', flag: '' },
         homeScore: saved.homeScore ?? '',
         awayScore: saved.awayScore ?? '',
       };
-    });
+      return acc;
+    }, {});
   }, [liveR32Matches, playoffScores]);
 
   const liveQFMatches = useMemo(() => {
-    const pairings = [
-      { id: 'QF_1', p: ['R16_1', 'R16_2'] }, { id: 'QF_2', p: ['R16_3', 'R16_4'] },
-      { id: 'QF_3', p: ['R16_5', 'R16_6'] }, { id: 'QF_4', p: ['R16_7', 'R16_8'] },
-    ];
-    return pairings.map(m => {
-      const saved = playoffScores[m.id] || {};
-      const hMatch = liveR16Matches.find(r => r.id === m.p[0]);
-      const aMatch = liveR16Matches.find(r => r.id === m.p[1]);
-      return {
-        id: m.id,
-        home: getStageWinner(m.p[0], hMatch?.home, hMatch?.away) || { id: 'TBD', name: 'TBD', flag: '' },
-        away: getStageWinner(m.p[1], aMatch?.home, aMatch?.away) || { id: 'TBD', name: 'TBD', flag: '' },
+    const structure = {
+      M97: ['M89', 'M90'],  // RD16 W1 & W2
+      M98: ['M93', 'M94'],  // RD16 W5 & W6
+      M99: ['M91', 'M92'],  // RD16 W3 & W4
+      M100: ['M95', 'M96']  // RD16 W7 & W8
+    };
+
+    return Object.keys(structure).reduce((acc, mId) => {
+      const saved = playoffScores[mId] || {};
+      const hSource = liveR16Matches[structure[mId][0]];
+      const aSource = liveR16Matches[structure[mId][1]];
+      acc[mId] = {
+        id: mId,
+        home: getWinner(hSource.id, hSource.home, hSource.away) || { id: 'TBD', name: 'TBD', flag: '' },
+        away: getWinner(aSource.id, aSource.home, aSource.away) || { id: 'TBD', name: 'TBD', flag: '' },
         homeScore: saved.homeScore ?? '',
         awayScore: saved.awayScore ?? '',
       };
-    });
+      return acc;
+    }, {});
   }, [liveR16Matches, playoffScores]);
 
   const liveSFMatches = useMemo(() => {
-    const pairings = [
-      { id: 'SF_1', p: ['QF_1', 'QF_2'] }, { id: 'SF_2', p: ['QF_3', 'QF_4'] }
-    ];
-    return pairings.map(m => {
-      const saved = playoffScores[m.id] || {};
-      const hMatch = liveQFMatches.find(r => r.id === m.p[0]);
-      const aMatch = liveQFMatches.find(r => r.id === m.p[1]);
-      return {
-        id: m.id,
-        home: getStageWinner(m.p[0], hMatch?.home, hMatch?.away) || { id: 'TBD', name: 'TBD', flag: '' },
-        away: getStageWinner(m.p[1], aMatch?.home, aMatch?.away) || { id: 'TBD', name: 'TBD', flag: '' },
+    const structure = {
+      M101: ['M97', 'M98'], // QF W1 & W2
+      M102: ['M99', 'M100'] // QF W3 & W4
+    };
+
+    return Object.keys(structure).reduce((acc, mId) => {
+      const saved = playoffScores[mId] || {};
+      const hSource = liveQFMatches[structure[mId][0]];
+      const aSource = liveQFMatches[structure[mId][1]];
+      acc[mId] = {
+        id: mId,
+        home: getWinner(hSource.id, hSource.home, hSource.away) || { id: 'TBD', name: 'TBD', flag: '' },
+        away: getWinner(aSource.id, aSource.home, aSource.away) || { id: 'TBD', name: 'TBD', flag: '' },
         homeScore: saved.homeScore ?? '',
         awayScore: saved.awayScore ?? '',
       };
-    });
+      return acc;
+    }, {});
   }, [liveQFMatches, playoffScores]);
 
   const liveFinalMatch = useMemo(() => {
-    const saved = playoffScores['FINAL'] || {};
-    return [{
-      id: 'FINAL',
-      home: getStageWinner('SF_1', liveSFMatches[0]?.home, liveSFMatches[0]?.away) || { id: 'TBD', name: 'TBD', flag: '' },
-      away: getStageWinner('SF_2', liveSFMatches[1]?.home, liveSFMatches[1]?.away) || { id: 'TBD', name: 'TBD', flag: '' },
+    const saved = playoffScores['M104'] || {};
+    const hSource = liveSFMatches['M101'];
+    const aSource = liveSFMatches['M102'];
+    return {
+      id: 'M104',
+      home: getWinner('M101', hSource?.home, hSource?.away) || { id: 'TBD', name: 'TBD', flag: '' },
+      away: getWinner('M102', aSource?.home, aSource?.away) || { id: 'TBD', name: 'TBD', flag: '' },
       homeScore: saved.homeScore ?? '',
       awayScore: saved.awayScore ?? '',
-    }];
+    };
   }, [liveSFMatches, playoffScores]);
 
   const champion = useMemo(() => {
-    const f = liveFinalMatch[0];
-    return getStageWinner('FINAL', f.home, f.away);
+    return getWinner('M104', liveFinalMatch.home, liveFinalMatch.away);
   }, [liveFinalMatch, playoffScores]);
 
-  // -----------------------------
-  // CLEAN COMPONENTS
-  // -----------------------------
+  // -------------------------------------------------------------
+  // SCANNABLE UI COMPONENTS
+  // -------------------------------------------------------------
   const TeamRow = ({ team }) => {
     const isTBD = !team || team.id === 'TBD';
     return (
@@ -219,11 +217,10 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   };
 
   const MatchCard = ({ match }) => {
+    if (!match) return null;
     return (
       <div className="w-full bg-[#0d131a] border border-slate-800/70 hover:border-emerald-500/30 rounded-lg p-1.5 shadow-md transition-all flex flex-col relative overflow-hidden group">
-        {/* Subtle accent indicator line on active matches */}
         <div className="absolute top-0 left-0 h-full w-[2px] bg-emerald-500/0 group-hover:bg-emerald-500/40 transition-all" />
-        
         <div className="flex items-center justify-between">
           <TeamRow team={match.home} />
           <input
@@ -233,9 +230,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
             onChange={e => updateScore(match.id, 'homeScore', e.target.value)}
           />
         </div>
-        
         <div className="h-[1px] bg-slate-800/40 my-1 w-[90%] mx-auto" />
-
         <div className="flex items-center justify-between">
           <TeamRow team={match.away} />
           <input
@@ -254,7 +249,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
       <div className="text-center text-[10px] tracking-widest text-slate-400 font-bold mb-3 uppercase border-b border-slate-800/80 pb-1.5 font-sans">
         {title}
       </div>
-      {data.map(m => <MatchCard key={m.id} match={m} />)}
+      {data.map(m => <MatchCard key={m?.id} match={m} />)}
     </div>
   );
 
@@ -262,34 +257,24 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
     <div className="w-full overflow-x-auto bg-[#070b0e] p-8 select-none font-sans">
       <div className="relative min-w-[1500px] grid grid-cols-9 gap-5 items-stretch content-center min-h-[760px]">
         
-        {/* LEFT BRACKET BRIDGES */}
-        <Column title="Round of 32" data={liveR32Matches.slice(0, 8)} className="space-y-3" />
-        <Column title="Round of 16" data={liveR16Matches.slice(0, 4)} className="space-y-14" />
-        <Column title="Quarterfinals" data={liveQFMatches.slice(0, 2)} className="space-y-36" />
-        <Column title="Semifinal" data={[liveSFMatches[0]]} className="space-y-0" />
+        {/* --- LEFT BRACKET --- */}
+        <Column title="Round of 32" data={[liveR32Matches.M74, liveR32Matches.M77, liveR32Matches.M130, liveR32Matches.M75, liveR32Matches.M83, liveR32Matches.M84, liveR32Matches.M81, liveR32Matches.M82]} className="space-y-3" />
+        <Column title="Round of 16" data={[liveR16Matches.M89, liveR16Matches.M90, liveR16Matches.M93, liveR16Matches.M94]} className="space-y-14" />
+        <Column title="Quarterfinals" data={[liveQFMatches.M97, liveQFMatches.M98]} className="space-y-36" />
+        <Column title="Semifinal" data={[liveSFMatches.M101]} className="space-y-0" />
 
-        {/* REFINED CENTRAL SHOWCASE NODE */}
+        {/* --- HERO CENTERPIECE --- */}
         <div className="flex flex-col justify-center items-center px-2 self-center space-y-5">
-          
-          {/* Logo Brand Frame */}
           <div className="w-full flex justify-center items-center pb-2">
-            <img 
-              src={cupImg} 
-              alt="FIFA 2026" 
-              className="w-24 h-auto object-contain opacity-90 brightness-95"
-            />
+            <img src={cupImg} alt="FIFA 2026" className="w-24 h-auto object-contain opacity-90 brightness-95" />
           </div>
 
-          {/* Premium Static Podium Container */}
           <div className="w-full bg-slate-900/40 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center text-center shadow-lg">
             <div className="text-[9px] tracking-[0.2em] text-slate-400 font-extrabold mb-3 uppercase">
               TOURNAMENT CHAMPION
             </div>
-            
             <div className={`w-32 h-20 rounded-lg border flex flex-col items-center justify-center transition-all ${
-              champion 
-                ? 'bg-emerald-950/20 border-emerald-500/30' 
-                : 'bg-slate-950/40 border-slate-800/80 border-dashed'
+              champion ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-slate-950/40 border-slate-800/80 border-dashed'
             }`}>
               {champion ? (
                 <div className="flex flex-col items-center space-y-1.5">
@@ -298,34 +283,29 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
                     alt={champion.name}
                     className="w-11 h-7 rounded-sm object-cover shadow border border-black/10"
                   />
-                  <span className="text-emerald-400 font-mono text-xs font-bold tracking-wider">
-                    {champion.id}
-                  </span>
+                  <span className="text-emerald-400 font-mono text-xs font-bold tracking-wider">{champion.id}</span>
                 </div>
               ) : (
-                <span className="text-[10px] text-slate-600 font-mono font-medium tracking-widest uppercase">
-                  Pending
-                </span>
+                <span className="text-[10px] text-slate-600 font-mono font-medium tracking-widest uppercase">Pending</span>
               )}
             </div>
           </div>
 
-          {/* Final Matchup Area */}
           <div className="w-full">
             <div className="text-center text-[10px] tracking-widest text-emerald-400 font-black mb-3 uppercase border-b border-emerald-950 pb-1 w-full">
               FINAL MATCH
             </div>
             <div className="w-full transform scale-105 shadow-xl relative z-10">
-              <MatchCard match={liveFinalMatch[0]} />
+              <MatchCard match={liveFinalMatch} />
             </div>
           </div>
         </div>
 
-        {/* RIGHT BRACKET BRIDGES */}
-        <Column title="Semifinal" data={[liveSFMatches[1]]} className="space-y-0" />
-        <Column title="Quarterfinals" data={liveQFMatches.slice(2, 4)} className="space-y-36" />
-        <Column title="Round of 16" data={liveR16Matches.slice(4, 8)} className="space-y-14" />
-        <Column title="Round of 32" data={liveR32Matches.slice(8, 16)} className="space-y-3" />
+        {/* --- RIGHT BRACKET --- */}
+        <Column title="Semifinal" data={[liveSFMatches.M102]} className="space-y-0" />
+        <Column title="Quarterfinals" data={[liveQFMatches.M99, liveQFMatches.M100]} className="space-y-36" />
+        <Column title="Round of 16" data={[liveR16Matches.M91, liveR16Matches.M92, liveR16Matches.M95, liveR16Matches.M96]} className="space-y-14" />
+        <Column title="Round of 32" data={[liveR32Matches.M76, liveR32Matches.M78, liveR32Matches.M79, liveR32Matches.M80, liveR32Matches.M86, liveR32Matches.M88, liveR32Matches.M85, liveR32Matches.M87]} className="space-y-3" />
 
       </div>
     </div>
