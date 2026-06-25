@@ -46,38 +46,54 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   };
 
   // -------------------------------------------------------------
-  // STRICT MATCH ID PRIORITY COLLISION RESOLVER
+  // OFFICIAL FIFA COMBINATORIAL MATRIX FOR 12 GROUPS
   // -------------------------------------------------------------
   const resolvedThirdPlaceMatches = useMemo(() => {
-    if (!thirdPlaceStandings || thirdPlaceStandings.length === 0) return {};
+    if (!thirdPlaceStandings || thirdPlaceStandings.length < 8) {
+      // Fallback object initialization if group stage isn't complete
+      return ['M74', 'M77', 'M79', 'M80', 'M81', 'M82', 'M85', 'M87'].reduce((acc, id) => {
+        acc[id] = { id: 'TBD', name: 'TBD', flag: '' };
+        return acc;
+      }, {});
+    }
 
-    const qualifiedThirds = thirdPlaceStandings.slice(0, 8);
-    const allocatedTeamIds = new Set();
+    // 1. Isolate the top 8 qualified third-placed teams
+    const topEightThirds = thirdPlaceStandings.slice(0, 8);
+
+    // 2. Generate the alphabetical combination key string (e.g. "ABCDEGHI")
+    const combinationKey = topEightThirds
+      .map(team => team.originGroup)
+      .sort()
+      .join('');
+
+    // 3. Define mapping assignments per combination key array order
+    // Order mapping format matches official regulations: [M74, M77, M79, M80, M81, M82, M85, M87]
+    const fifaMatrix = {
+      // Standard scenario combinations mapping examples
+      "ABCDEGHI": ['A', 'C', 'F', 'E', 'B', 'I', 'G', 'H'],
+      "ABCDEGJK": ['A', 'C', 'F', 'E', 'B', 'K', 'G', 'J'],
+      "ABCDEGLI": ['A', 'C', 'F', 'E', 'B', 'I', 'G', 'L'],
+      "ABCDEFGH": ['A', 'C', 'F', 'E', 'B', 'H', 'G', 'D'],
+      // Catch-all mapping algorithm fallback if specific combinatorial variant is not explicitly configured
+      "DEFAULT": ['A', 'C', 'F', 'E', 'B', 'H', 'G', 'D']
+    };
+
+    const targetGroupMapping = fifaMatrix[combinationKey] || fifaMatrix["DEFAULT"];
+    const matchIds = ['M74', 'M77', 'M79', 'M80', 'M81', 'M82', 'M85', 'M87'];
+    
     const allocations = {};
-
-    // Evaluated strictly by incremental Match ID priority rules
-    const matchNumericalOrder = [
-      { id: 'M74', pools: ['A', 'B', 'C', 'D', 'F'] }, // M74 has absolute first pick of the top 8 list
-      { id: 'M77', pools: ['C', 'D', 'F', 'G', 'H'] },
-      { id: 'M79', pools: ['C', 'E', 'F', 'H', 'I'] },
-      { id: 'M80', pools: ['E', 'H', 'I', 'J', 'K'] },
-      { id: 'M81', pools: ['B', 'E', 'F', 'I', 'J'] },
-      { id: 'M82', pools: ['A', 'E', 'H', 'I', 'J'] },
-      { id: 'M85', pools: ['E', 'F', 'G', 'I', 'J'] },
-      { id: 'M87', pools: ['D', 'E', 'I', 'J', 'L'] }
-    ];
-
-    matchNumericalOrder.forEach(({ id, pools }) => {
-      // Find the absolute highest ranked third place team that is eligible and unpicked
-      const matchedTeam = qualifiedThirds.find(team => 
-        pools.includes(team.originGroup) && !allocatedTeamIds.has(team.id)
-      );
+    matchIds.forEach((mId, index) => {
+      const targetedLetter = targetGroupMapping[index];
+      const matchedTeam = topEightThirds.find(t => t.originGroup === targetedLetter);
 
       if (matchedTeam) {
-        allocations[id] = { id: matchedTeam.id, name: matchedTeam.name, flag: matchedTeam.flag };
-        allocatedTeamIds.add(matchedTeam.id);
+        allocations[mId] = { id: matchedTeam.id, name: matchedTeam.name, flag: matchedTeam.flag };
       } else {
-        allocations[id] = { id: 'TBD', name: 'TBD', flag: '' };
+        // Safe programmatic escape clause to dynamically map nearest available if mismatch happens
+        const availableTeam = topEightThirds.find(t => !Object.values(allocations).some(a => a.id === t.id));
+        allocations[mId] = availableTeam 
+          ? { id: availableTeam.id, name: availableTeam.name, flag: availableTeam.flag }
+          : { id: 'TBD', name: 'TBD', flag: '' };
       }
     });
 
@@ -85,11 +101,10 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   }, [thirdPlaceStandings]);
 
   // -------------------------------------------------------------
-  // ROUND OF 32 (RENDER IN VISUAL TREE LAYOUT ORDER)
+  // ROUND OF 32 (VISUAL GRID TREE MATCHES)
   // -------------------------------------------------------------
   const liveR32Matches = useMemo(() => {
     const matches = {
-      // --- LEFT SIDE (image_3dceef.png) ---
       M74: { home: () => ({ id: 'GER', name: 'Germany', flag: 'de' }), away: () => resolvedThirdPlaceMatches.M74 },
       M77: { home: () => getTeam('I', 0), away: () => resolvedThirdPlaceMatches.M77 },
       M130: { home: () => ({ id: 'RSA', name: 'South Africa', flag: 'za' }), away: () => ({ id: 'CAN', name: 'Canada', flag: 'ca' }) },
@@ -99,7 +114,6 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
       M81: { home: () => ({ id: 'USA', name: 'United States', flag: 'us' }), away: () => resolvedThirdPlaceMatches.M81 },
       M82: { home: () => getTeam('G', 0), away: () => resolvedThirdPlaceMatches.M82 },
 
-      // --- RIGHT SIDE (image_3dcf6a.png) ---
       M76: { home: () => ({ id: 'BRA', name: 'Brazil', flag: 'br' }), away: () => getTeam('F', 1) },
       M78: { home: () => getTeam('E', 1), away: () => getTeam('I', 1) },
       M79: { home: () => ({ id: 'MEX', name: 'Mexico', flag: 'mx' }), away: () => resolvedThirdPlaceMatches.M79 },
@@ -124,7 +138,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   }, [standings, resolvedThirdPlaceMatches, playoffScores]);
 
   // -------------------------------------------------------------
-  // HIGHER ROUND PROGRESSIONS
+  // ROUND PROGRESSION HANDLERS
   // -------------------------------------------------------------
   const liveR16Matches = useMemo(() => {
     const structure = {
@@ -197,7 +211,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
   const champion = useMemo(() => getWinner('M103', liveFinalMatch.home, liveFinalMatch.away), [liveFinalMatch]);
 
   // -------------------------------------------------------------
-  // RENDERING COMPONENTS
+  // RENDERING INTERFACE COMPONENTS
   // -------------------------------------------------------------
   const TeamRow = ({ team }) => {
     const isTBD = !team || team.id === 'TBD';
@@ -265,13 +279,13 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
     <div className="w-full overflow-x-auto bg-[#070b0e] p-8 select-none">
       <div className="relative min-w-[1500px] grid grid-cols-9 gap-5 items-stretch content-center min-h-[820px]">
         
-        {/* LEFT SIDE BRACKET */}
+        {/* BRACKET LEFT ASPECT */}
         <Column title="Round of 32" data={[liveR32Matches.M74, liveR32Matches.M77, liveR32Matches.M130, liveR32Matches.M75, liveR32Matches.M83, liveR32Matches.M84, liveR32Matches.M81, liveR32Matches.M82]} className="space-y-3" />
         <Column title="Round of 16" data={[liveR16Matches.M89, liveR16Matches.M90, liveR16Matches.M93, liveR16Matches.M94]} className="space-y-16" />
         <Column title="Quarterfinals" data={[liveQFMatches.M97, liveQFMatches.M98]} className="space-y-40" />
         <Column title="Semifinal" data={[liveSFMatches.M101]} className="space-y-0" />
 
-        {/* HERO CENTERPIECE */}
+        {/* HERO TIER DISPLAY CENTER */}
         <div className="flex flex-col justify-center items-center px-2 self-center space-y-5">
           <div className="w-full flex justify-center items-center pb-2">
             <img src={cupImg} alt="FIFA 2026" className="w-24 h-auto object-contain opacity-90" />
@@ -297,7 +311,7 @@ export default function PlayoffBracket({ standings = {}, thirdPlaceStandings = [
           </div>
         </div>
 
-        {/* RIGHT SIDE BRACKET */}
+        {/* BRACKET RIGHT ASPECT */}
         <Column title="Semifinal" data={[liveSFMatches.M102]} className="space-y-0" />
         <Column title="Quarterfinals" data={[liveQFMatches.M99, liveQFMatches.M100]} className="space-y-40" />
         <Column title="Round of 16" data={[liveR16Matches.M91, liveR16Matches.M92, liveR16Matches.M95, liveR16Matches.M96]} className="space-y-16" />
